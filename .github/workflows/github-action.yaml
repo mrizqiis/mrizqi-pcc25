@@ -1,13 +1,13 @@
-name: Build and Push Docker Image
+name: Build, Push, and Deploy Docker Image to AWS EC2
 
 on:
   push:
     branches:
-      - main  # Jalankan saat push ke main
-  workflow_dispatch:  # Bisa dijalankan manual dari GitHub
+      - main
+  workflow_dispatch:
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -38,3 +38,15 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull mrizqiis/simple-app:0.1.0
+            docker stop web-app || true
+            docker rm web-app || true
+            docker run -d --name web-app -p 80:80 mrizqiis/simple-app:0.1.0
