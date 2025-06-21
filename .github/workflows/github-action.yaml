@@ -1,14 +1,17 @@
-name: Build and Push Docker Image
+name: Build, Push and Deploy Docker Image
 
 on:
   push:
     branches:
-      - main  # Jalankan saat push ke main
-  workflow_dispatch:  # Bisa dijalankan manual dari GitHub
+      - main
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
+    outputs:
+      image-tag: mrizqiis/simple-app:0.1.0
 
     steps:
       - name: Checkout source code
@@ -32,9 +35,28 @@ jobs:
             type=raw,value=0.1.0
 
       - name: Build and Push Docker image
+        id: build-and-push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Deploy to EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker pull mrizqiis/simple-app:0.1.0
+            docker stop simple-app || true
+            docker rm simple-app || true
+            docker run -d --name simple-app -p 80:80 mrizqiis/simple-app:0.1.0
